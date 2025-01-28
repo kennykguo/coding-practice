@@ -7,8 +7,8 @@ class Solution:
 
         def dfs(cur_idx, numbers):
 
-            if cur_idx >= n:
-                return
+            # if cur_idx >= n: # THIS WILL ACTUALLY NEVER HAPPEN ! Just a waste of CPU
+            #     return
             
             if sum(numbers) > target:
                 return
