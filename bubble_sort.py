@@ -6,9 +6,5 @@ for i in range(len(list)):
             temp = list[j]
             list[j] = list[j+1]
             list[j+1] = temp
-
-
 print(len(list))
 print(list)
-
-    
