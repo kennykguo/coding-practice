@@ -9,6 +9,10 @@ class MedianFinder: # SOLVE AGAIN
 
         # print(self.max_heap)
         # print(self.min_heap)
+        # After balancing, ensure that the largest of max_heap is not greater than the smallest of min_heap
+        if self.max_heap and self.min_heap and -self.max_heap[0] > self.min_heap[0]:
+            val = heappop(self.max_heap)
+            heappush(self.min_heap, -val)  # Move the smaller value to min_heap
 
         # If we have 2 greater than the min_heap
         # if (self.max_heap and self.min_heap and -1 * self.max_heap[0] > self.min_heap[0]):
@@ -21,12 +25,6 @@ class MedianFinder: # SOLVE AGAIN
             val = heappop(self.min_heap)
             heappush(self.max_heap, -1 * val)
         
-        # After balancing, ensure that the largest of max_heap is not greater than the smallest of min_heap
-        if self.max_heap and self.min_heap and -self.max_heap[0] > self.min_heap[0]:
-            val1 = heappop(self.max_heap)
-            val2 = heappop(self.min_heap)
-            heappush(self.max_heap, -val2)  # Move the larger value to max_heap
-            heappush(self.min_heap, -val1)  # Move the smaller value to min_heap
         
             
     def findMedian(self) -> float:
