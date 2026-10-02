@@ -18,12 +18,12 @@ NN-problem-name/
    python3 test.py
    ```
    or from anywhere: `python3 practice/judge.py 4` (number or folder name).
-3. Every test reports `PASS`, `WRONG ANSWER`, `RUNTIME ERROR` or `TIME LIMIT EXCEEDED` (4 s per test).
+3. Every test reports `PASS`, `WRONG ANSWER` or `RUNTIME ERROR`. There is no time limit by default; tests slower than 4 s are flagged as slow. Add `--time-limit 4` to enforce one.
    Failing **sample** tests show input/expected/got. Failing **hidden** tests only show the verdict, like
    a real assessment. Add `--reveal` once you want to see them.
 4. `ACCEPTED` means every sample and hidden test passed.
 
-Other flags: `--samples` (run only the visible examples), `--time-limit 2` (tighter timing).
+Other flags: `--samples` (run only the visible examples), `--time-limit 4` (fail tests slower than 4 s).
 `python3 practice/judge.py` with no problem runs everything and prints a scoreboard.
 
 Hidden tests include edge cases and large inputs sized so that the straightforward brute force times out

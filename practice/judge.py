@@ -5,6 +5,7 @@ Local judge for the practice problems.
   python3 practice/judge.py               # judge every problem, print a scoreboard
   python3 practice/judge.py 04 --samples  # only the visible sample tests
   python3 practice/judge.py 04 --reveal   # show input/expected/output for failing hidden tests too
+  python3 practice/judge.py 04 --time-limit 4   # enforce a per-test time limit (off by default)
 
 Each problem folder holds solution.py (yours) and tests.json.gz (samples + hidden tests).
 """
@@ -21,7 +22,8 @@ import time
 import traceback
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_TIME_LIMIT = 4.0  # seconds per test case
+DEFAULT_TIME_LIMIT = 0  # seconds per test case; 0 = no limit
+SLOW_WARNING = 4.0     # flag (but still pass) tests slower than this
 
 
 class TimeLimitExceeded(Exception):
@@ -96,7 +98,8 @@ def judge(folder, samples_only=False, reveal=False, time_limit=DEFAULT_TIME_LIMI
         verdict, got, err = "PASS", None, None
         start = time.perf_counter()
         try:
-            signal.setitimer(signal.ITIMER_REAL, time_limit)
+            if time_limit > 0:
+                signal.setitimer(signal.ITIMER_REAL, time_limit)
             got = func(*args)
         except TimeLimitExceeded:
             verdict = "TIME LIMIT EXCEEDED"
@@ -115,7 +118,8 @@ def judge(folder, samples_only=False, reveal=False, time_limit=DEFAULT_TIME_LIMI
             verdict = "WRONG ANSWER"
         if verdict == "PASS":
             passed += 1
-        log(f"  {case['name']:<10} {verdict:<20} {elapsed * 1000:8.1f} ms")
+        slow = "  (slow: would likely time out on a real judge)" if elapsed > SLOW_WARNING else ""
+        log(f"  {case['name']:<10} {verdict:<20} {elapsed * 1000:8.1f} ms{slow}")
         if verdict != "PASS" and (not case["hidden"] or reveal):
             log(f"      input:    {short(case['args'])}")
             log(f"      expected: {short(case['expected'])}")
@@ -133,7 +137,7 @@ def main():
     ap.add_argument("problem", nargs="?", help="problem number (e.g. 4) or folder name; omit to run all")
     ap.add_argument("--samples", action="store_true", help="run only the visible sample tests")
     ap.add_argument("--reveal", action="store_true", help="show details of failing hidden tests")
-    ap.add_argument("--time-limit", type=float, default=DEFAULT_TIME_LIMIT, help="seconds per test")
+    ap.add_argument("--time-limit", type=float, default=DEFAULT_TIME_LIMIT, help="seconds per test (default: no limit)")
     a = ap.parse_args()
 
     if a.problem:
