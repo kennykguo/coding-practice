@@ -1,0 +1,859 @@
+\documentclass[10pt]{article}
+
+\usepackage[margin=0.5in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multicol}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2pt}
+\setlength{\columnsep}{16pt}
+\setlist{nosep, leftmargin=1.1em}
+
+\definecolor{kw}{RGB}{0,70,160}
+\definecolor{cm}{RGB}{95,125,95}
+\definecolor{st}{RGB}{165,60,30}
+\definecolor{codebg}{RGB}{247,247,249}
+
+\lstdefinestyle{py}{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cm}\itshape,
+  stringstyle=\color{st},
+  morekeywords={nonlocal,True,False,None,yield},
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  upquote=true,
+  tabsize=4,
+  frame=single,
+  rulecolor=\color{black!12},
+  backgroundcolor=\color{codebg},
+  xleftmargin=2pt, xrightmargin=2pt,
+  aboveskip=3pt, belowskip=3pt
+}
+\lstnewenvironment{py}{\lstset{style=py}}{}
+\lstnewenvironment{tpl}{\lstset{style=py}}{}   % self-contained templates (extracted + tested)
+
+% inline code: never put the characters # % \ or unbalanced braces inside \cd{}
+\newcommand{\cd}[1]{\texttt{\detokenize{#1}}}
+
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{0pt}{6pt plus 2pt}{3pt}{\large\bfseries\color{kw}}}
+\renewcommand\subsection{\@startsection{subsection}{2}{0pt}{4pt plus 1pt}{2pt}{\normalsize\bfseries}}
+\makeatother
+
+\begin{document}
+
+{\centering {\LARGE\bfseries Python Review Cheatsheet}\\[2pt]
+{\small Fundamentals, standard library, performance, and algorithm patterns for timed coding assessments}\par}
+\vspace{4pt}
+
+\begin{multicols}{2}
+\small
+
+% =====================================================================
+\section{Complexity budget}
+CPython does about $10^7$ simple operations per second; budget about $10^7$--$5\cdot10^7$ per test.
+
+\begin{tabular}{@{}ll@{}}
+\toprule
+Max $n$ & Target complexity \\
+\midrule
+$\le 10$ & $O(n!)$ \\
+$\le 20$ & $O(2^n)$, $O(n 2^n)$ \\
+$\le 500$ & $O(n^3)$ (tight) \\
+$\le 5\cdot 10^3$ & $O(n^2)$ \\
+$\le 10^6$ & $O(n \log n)$, $O(n)$ \\
+$\ge 10^9$ & $O(\log n)$, $O(1)$, math \\
+\bottomrule
+\end{tabular}
+
+Grids: touch each cell $O(1)$ (or $O(\log)$) times. Values up to $10^{12}$ mean you can't simulate step by step; use arithmetic.
+
+% =====================================================================
+\section{Numbers}
+\begin{py}
+7 // 2, -7 // 2        # 3, -4   floor toward -inf
+7 % 3, -7 % 3          # 1, 2    sign of divisor
+int(-7 / 2)            # -3      truncate toward 0
+divmod(17, 5)          # (3, 2)
+-(-a // b)             # ceil(a / b) for ints, exact
+2 ** 10, pow(2, 10, MOD)    # fast modular power
+pow(a, -1, MOD)        # modular inverse (3.8+)
+abs(x), round(2.5)     # 2 !  banker's rounding
+int(x + 0.5)           # round half up (x >= 0)
+float('inf'), -math.inf
+10**18 + 1             # ints never overflow
+0.1 + 0.2 == 0.3       # False -> math.isclose
+int("ff", 16), int("101", 2), bin(5), hex(255)
+1_000_000              # digit separators
+\end{py}
+
+\subsection{Bit tricks}
+\begin{py}
+x & 1                  # odd?
+x >> k & 1             # k-th bit
+x | (1 << k)           # set bit k
+x & ~(1 << k)          # clear bit k
+x ^ (1 << k)           # toggle bit k
+x & (x - 1)            # drop lowest set bit
+x & -x                 # lowest set bit
+x.bit_count()          # popcount (3.10+); bin(x).count("1")
+x.bit_length()         # floor(log2 x) + 1
+x & (x - 1) == 0       # power of two (x > 0)
+a ^ b ^ a == b         # XOR cancels pairs
+for sub in range(1 << n): ...           # all subsets
+s = mask
+while s:                                 # all submasks
+    s = (s - 1) & mask
+\end{py}
+
+% =====================================================================
+\section{Core syntax}
+\begin{py}
+a, b = b, a                       # swap
+first, *rest = lst                # unpacking
+x = a if cond else b              # ternary
+if (n := len(s)) > 10: ...        # walrus
+0 <= r < R and 0 <= c < C         # chained compare
+for i, x in enumerate(a, start=1): ...
+for x, y in zip(a, b): ...        # shortest wins
+for x, y in zip(a, a[1:]): ...    # adjacent pairs
+for i in reversed(range(n)): ...
+for i in range(n - 1, -1, -1): ...
+while True: ... break
+for ...: ... else: ...            # else runs if no break
+\end{py}
+
+\subsection{Truthiness and identity}
+Falsy: \cd{0, 0.0, "", [], {}, set(), None, False}. Use \cd{is None} / \cd{is not None} when 0 is a valid
+value. \cd{==} compares values; \cd{is} compares identity.
+
+\subsection{Comprehensions and generators}
+\begin{py}
+[f(x) for x in it if p(x)]
+[x if p(x) else y for x in it]   # map with ternary
+{k: v for k, v in pairs}
+{x % 10 for x in nums}
+sum(x * x for x in nums)          # generator: no list
+[[0] * C for _ in range(R)]       # 2D grid (correct)
+[v for row in grid for v in row]  # flatten
+def gen():                        # lazy sequence
+    yield 1
+    yield from range(3)
+\end{py}
+
+\subsection{Functions and scope}
+\begin{py}
+def f(a, b=0, *args, key=None, **kw): ...
+lambda x: x[1]
+def outer():
+    cnt = 0
+    def inner():
+        nonlocal cnt              # needed to REBIND
+        cnt += 1                  # (mutating a list is fine without it)
+\end{py}
+Names assigned inside a function are local unless declared \cd{nonlocal}/\cd{global}.
+
+\subsection{Classes (for nodes, heap items)}
+\begin{py}
+class Node:
+    __slots__ = ("val", "next")   # faster, less memory
+    def __init__(self, val, nxt=None):
+        self.val, self.next = val, nxt
+    def __lt__(self, other):      # makes it heap-comparable
+        return self.val < other.val
+    def __repr__(self):
+        return f"Node({self.val})"
+
+from dataclasses import dataclass, field
+@dataclass(order=True)
+class Item:
+    prio: int
+    name: str = field(compare=False)
+\end{py}
+
+% =====================================================================
+\section{Strings}
+\begin{py}
+s[i], s[-1], s[a:b], s[::-1]
+"".join(parts)          # O(total); s += c in a loop may be O(n^2)
+s.split(), s.split(","), s.splitlines()
+s.strip(), s.lstrip("0"), s.rstrip()
+s.lower(), s.upper(), s.swapcase(), s.title()
+s.startswith(p), s.endswith(p)
+s.find(t)               # -1 if missing; s.index(t) raises
+s.count(t), s.replace(a, b), t in s
+s.isdigit(), s.isalpha(), s.isalnum(), s.isspace()
+ord("a"), chr(97); ord(c) - ord("a")     # 0..25
+s.zfill(4), s.rjust(5), s.ljust(5, "."), s.center(9)
+f"{x:.2f} {n:05d} {s:>8} {v!r} {big:,}"
+"-".join(map(str, nums))
+list(s) / "".join(chars)                 # strings are immutable
+s[:i] + c + s[i + 1:]                    # replace one char (O(n))
+import string; string.ascii_lowercase, string.digits
+sorted(s), "".join(sorted(s))            # anagram key
+\end{py}
+
+% =====================================================================
+\section{Lists and tuples}
+\begin{py}
+a.append(x); a.extend(it); a.insert(i, x)
+a.pop(); a.pop(i); a.remove(x); del a[i]; del a[i:j]
+a.index(x); a.count(x); a.clear()
+a.sort(); a.reverse()         # in place, return None
+a[::-1], a[::2], a[1:-1]      # slices are copies
+a[i:j] = [x, y]               # slice assignment
+a * 3, a + b                  # new lists
+b = a[:]; b = list(a); b = a.copy()       # shallow copy
+g2 = [row[:] for row in grid]             # copy a grid
+import copy; copy.deepcopy(x)             # slow
+max(a, key=f), min(a, default=0)
+sum(a), any(a), all(a), len(a)
+a.sort(key=lambda t: (-t[1], t[0]))       # multi-key
+t = (1, 2); t + (3,); (x,)                 # 1-tuple needs comma
+\end{py}
+\textbf{Matrix tricks:}
+\begin{py}
+list(zip(*m))                     # transpose (tuples)
+[list(r) for r in zip(*m[::-1])]  # rotate 90 cw
+[list(r) for r in zip(*m)][::-1]  # rotate 90 ccw
+[row[::-1] for row in m]          # mirror left-right
+m[::-1]                           # flip upside-down
+# diagonals: r - c is constant on "\" diagonals, r + c on "/"
+# flatten index: k = r * C + c;  r, c = divmod(k, C)
+\end{py}
+
+% =====================================================================
+\section{dict / set / collections}
+\begin{py}
+d.get(k, 0); d.setdefault(k, []).append(v)
+d.pop(k, None); k in d; d.items(); d.keys()
+d | other; d.update(other)          # merge
+dict(zip(keys, vals)); dict.fromkeys(keys, 0)
+max(d, key=d.get)                   # key with max value
+# insertion order is preserved (3.7+)
+
+s.add(x); s.discard(x); s.remove(x); s.pop()
+a | b, a & b, a - b, a ^ b, a <= b, a.isdisjoint(b)
+frozenset(cells)        # hashable set
+tuple(lst)              # hashable list
+# hashable: int, str, tuple(of hashables), frozenset
+
+from collections import defaultdict, Counter, deque, OrderedDict
+g = defaultdict(list); g[u].append(v)
+# reading g[x] INSERTS x -> use `x in g` to test
+c = Counter(it); c[x] += 1; c[missing] == 0
+c.most_common(k); c.total()         # total: 3.10+
+c1 + c2, c1 - c2, c1 & c2, c1 | c2  # multiset ops
+Counter(a) == Counter(b)            # anagram check
+od = OrderedDict(); od.move_to_end(k)
+od.popitem(last=False)              # pop oldest -> LRU cache
+\end{py}
+
+\subsection{deque}
+\begin{py}
+q = deque([x]); q.append(x); q.appendleft(x)
+q.pop(); q.popleft(); q[0]; q[-1]   # O(1) ends
+q.rotate(k); deque(maxlen=k)        # ring buffer
+\end{py}
+
+\subsection{heapq (min-heap on a list)}
+\begin{py}
+import heapq
+heapq.heappush(h, (prio, i, item))  # i breaks ties
+prio, _, item = heapq.heappop(h)
+h[0]                                # peek
+heapq.heapify(a)                    # O(n)
+heapq.heappushpop(h, x); heapq.heapreplace(h, x)
+heapq.nlargest(k, it, key=f); heapq.nsmallest(k, it)
+heapq.merge(*sorted_lists)          # lazy k-way merge
+heapq.heappush(h, -x)               # max-heap via negation
+\end{py}
+
+\subsection{bisect (sorted lists)}
+\begin{py}
+import bisect
+bisect.bisect_left(a, x)    # first i with a[i] >= x
+bisect.bisect_right(a, x)   # first i with a[i] >  x
+bisect.insort(a, x)         # O(n) insert
+bisect.bisect_left(a, x, key=f)     # key= is 3.10+
+n_in = bisect.bisect_right(a, hi) - bisect.bisect_left(a, lo)
+\end{py}
+
+% =====================================================================
+\section{Sorting}
+\begin{py}
+sorted(a, key=f, reverse=True)       # stable, O(n log n)
+a.sort(key=lambda x: (len(x), x))
+from operator import itemgetter, attrgetter
+a.sort(key=itemgetter(1, 0))
+order = sorted(range(n), key=a.__getitem__)   # argsort
+pos = [0] * n
+for rank, i in enumerate(order):
+    pos[i] = rank                    # inverse permutation
+from functools import cmp_to_key
+a.sort(key=cmp_to_key(lambda x, y: (x > y) - (x < y)))
+\end{py}
+Stability lets you sort by secondary key first, then primary.
+
+% =====================================================================
+\section{itertools / functools / math}
+\begin{py}
+from itertools import (accumulate, product, permutations,
+    combinations, combinations_with_replacement, groupby,
+    pairwise, chain, count, cycle, islice, repeat, starmap)
+list(accumulate(a, initial=0))       # prefix sums
+list(accumulate(a, max))             # running max
+product(range(3), repeat=2)          # nested loops
+permutations(a, r); combinations(a, r)
+[(k, len(list(g))) for k, g in groupby(s)]   # RLE
+chain.from_iterable(lists)           # flatten one level
+islice(it, 10)
+
+from functools import cache, lru_cache, reduce, partial
+@cache                               # memoize (args hashable)
+def f(i, j): ...
+f.cache_clear()
+reduce(lambda x, y: x * y, a, 1); math.prod(a)
+
+import math
+math.gcd(a, b), math.lcm(a, b), math.isqrt(n)
+math.comb(n, k), math.perm(n, k), math.factorial(n)
+math.sqrt, math.log(x, b), math.log2, math.hypot
+math.floor, math.ceil, math.inf, math.pi
+math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9)
+\end{py}
+
+% =====================================================================
+\section{Recursion}
+\begin{py}
+import sys
+sys.setrecursionlimit(10**6)   # default ~1000 frames
+\end{py}
+\begin{itemize}
+  \item Fine for depth $\le$ a few thousand: backtracking, balanced trees, memoised DP on small ranges.
+  \item Grids, chains and graphs of size $\ge 10^4$: use an explicit stack/queue. Very deep recursion can
+        crash the interpreter even with a raised limit.
+  \item Memoised recursion = top-down DP; convert to bottom-up if depth or speed is a problem.
+\end{itemize}
+
+% =====================================================================
+\section{Operation costs}
+\begin{tabular}{@{}p{1.4cm}p{3.1cm}p{3.3cm}@{}}
+\toprule
+Type & $O(1)$ & $O(n)$ / other \\
+\midrule
+list & \cd{a[i]}, append, pop(), len & \cd{x in a}, insert/pop(0), remove, slice, \cd{a+b}, index \\
+dict/set & get/set/del, \cd{in}, add & copy, iterate \\
+deque & both ends & middle index \\
+heap & \cd{h[0]} & push/pop $\log n$; heapify $n$ \\
+str & index, len & slice, \cd{+}, \cd{in}, join \\
+sort & -- & $n \log n$ \\
+\bottomrule
+\end{tabular}
+
+% =====================================================================
+\section{Performance tricks}
+\begin{itemize}
+  \item Convert to a \cd{set} before repeated membership tests.
+  \item Dense integer keys: use a list, not a dict. Flatten \cd{(r, c)} to \cd{r * C + c}.
+  \item Built-ins (\cd{sum}, \cd{max}, \cd{sorted}, slicing, \cd{str.join}, \cd{Counter}) run in C. Prefer them over manual loops.
+  \item Hoist lookups: \cd{row = grid[r]}, \cd{append = res.append}, local variables over globals.
+  \item Carry running totals instead of recomputing \cd{sum(path)}.
+  \item Avoid \cd{deepcopy}, string \cd{+=} in loops, and \cd{list.pop(0)}.
+  \item Big integers as bitsets: \cd{bits |= bits << x} gives subset sums fast.
+  \item Fast input: \cd{data = sys.stdin.buffer.read().split()}.
+  \item Avoid \cd{print} in hot loops.
+\end{itemize}
+
+% =====================================================================
+\section{Pitfalls}
+\begin{itemize}
+  \item \cd{[[0] * C] * R} aliases rows. Use a comprehension.
+  \item Mutable default args (\cd{def f(a=[])}) are shared across calls.
+  \item \cd{res.append(path)} stores a reference. Append \cd{path[:]}.
+  \item Lambdas in loops capture the variable, not its value: \cd{lambda i=i: i}.
+  \item \cd{a.sort()} returns \cd{None}; don't write \cd{a = a.sort()}.
+  \item Modifying a list/dict while iterating over it. Iterate over a copy or build a new one.
+  \item \cd{defaultdict} lookup inserts keys (it changes \cd{len} and iteration).
+  \item \cd{round()} is banker's rounding; \cd{/} always returns a float.
+  \item \cd{min()}/\cd{max()} on an empty sequence raises. Pass \cd{default=}.
+  \item \cd{str.split()} vs \cd{str.split(" ")} handle repeated spaces differently.
+  \item \cd{@cache} on a nested function is rebuilt on every outer call (good); on a global one it persists across tests (call \cd{cache_clear}).
+  \item Shadowing built-ins: \cd{sum}, \cd{list}, \cd{max}, \cd{id}, \cd{input}, \cd{map}.
+  \item Integer vs.\ float: never compare floats with \cd{==}; prefer integer arithmetic.
+\end{itemize}
+
+% =====================================================================
+\section{Pattern recognition}
+\begin{tabular}{@{}p{3.5cm}p{4.3cm}@{}}
+\toprule
+Signal in the problem & Reach for \\
+\midrule
+fewest moves / steps, unweighted & BFS (level by level) \\
+many starting points & multi-source BFS \\
+states are strings/tuples & implicit-graph BFS \\
+weighted shortest path & Dijkstra (heap) \\
+connected groups, regions & DFS/BFS or union--find \\
+prerequisites, ordering & topological sort \\
+each node has one next & functional graph walk \\
+all combinations / arrangements & backtracking \\
+count ways / best value, overlapping subproblems & DP \\
+two players, optimal play & minimax interval DP \\
+contiguous subarray sum & prefix sums (+ hashmap) \\
+range sums in a grid & 2D prefix sums \\
+longest/shortest window with a property & sliding window \\
+sorted input, pair/triple sums & two pointers \\
+max/min $x$ such that ok($x$), monotone & binary search on answer \\
+next greater/smaller element & monotonic stack \\
+top $k$, running median, merge $k$ & heap(s) \\
+overlapping intervals & sort by start (merge) / end (select) \\
+reachability, local choice suffices & greedy (prove or brute-check) \\
+huge step counts of shifts & track cumulative offset / extremes \\
+synchronous grid update & new grid or bit-encoded next state \\
+$n \le 20$ & bitmask / brute force \\
+\bottomrule
+\end{tabular}
+
+% =====================================================================
+\section{Templates: graphs and grids}
+
+\subsection{Grid helpers}
+\begin{py}
+R, C = len(g), len(g[0])
+D4 = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+D8 = [(a, b) for a in (-1, 0, 1) for b in (-1, 0, 1) if a or b]
+CW = [(-1, 0), (0, 1), (1, 0), (0, -1)]   # up right down left
+d = (d + 1) % 4   # turn right;  (d - 1) % 4 turn left
+for dr, dc in D4:
+    nr, nc = r + dr, c + dc
+    if 0 <= nr < R and 0 <= nc < C: ...
+\end{py}
+
+\subsection{BFS (shortest path, unweighted)}
+\begin{tpl}
+from collections import deque
+
+def bfs(start, target, neighbors):
+    q, seen, steps = deque([start]), {start}, 0
+    while q:
+        for _ in range(len(q)):          # one level
+            u = q.popleft()
+            if u == target:
+                return steps
+            for v in neighbors(u):
+                if v not in seen:        # mark on ENQUEUE
+                    seen.add(v)
+                    q.append(v)
+        steps += 1
+    return -1
+\end{tpl}
+Multi-source: start the queue with every source. 0--1 BFS (edge weights 0/1): deque, \cd{appendleft}
+for 0-weight edges. Bidirectional BFS: expand the smaller frontier.
+
+\subsection{Iterative DFS / flood fill}
+\begin{tpl}
+def flood(grid, r, c, seen):
+    R, C = len(grid), len(grid[0])
+    stack, cells = [(r, c)], []
+    seen[r][c] = True
+    while stack:
+        a, b = stack.pop()
+        cells.append((a, b))
+        for x, y in ((a+1, b), (a-1, b), (a, b+1), (a, b-1)):
+            if (0 <= x < R and 0 <= y < C and not seen[x][y]
+                    and grid[x][y] == grid[r][c]):
+                seen[x][y] = True
+                stack.append((x, y))
+    return cells
+\end{tpl}
+
+\subsection{Dijkstra}
+\begin{tpl}
+import heapq
+
+def dijkstra(adj, src):              # adj[u] = [(v, w), ...]
+    dist = {src: 0}
+    h = [(0, src)]
+    while h:
+        d, u = heapq.heappop(h)
+        if d > dist[u]:
+            continue                 # stale entry
+        for v, w in adj[u]:
+            nd = d + w
+            if nd < dist.get(v, float("inf")):
+                dist[v] = nd
+                heapq.heappush(h, (nd, v))
+    return dist
+\end{tpl}
+
+\subsection{Union--Find}
+\begin{tpl}
+class DSU:
+    def __init__(self, n):
+        self.p, self.sz = list(range(n)), [1] * n
+    def find(self, x):
+        while self.p[x] != x:
+            self.p[x] = self.p[self.p[x]]   # path halving
+            x = self.p[x]
+        return x
+    def union(self, a, b):
+        a, b = self.find(a), self.find(b)
+        if a == b:
+            return False                    # already joined
+        if self.sz[a] < self.sz[b]:
+            a, b = b, a
+        self.p[b] = a
+        self.sz[a] += self.sz[b]
+        return True
+\end{tpl}
+
+\subsection{Topological sort / cycle detection}
+\begin{tpl}
+from collections import deque
+
+def topo_sort(n, edges):             # (u, v): u before v
+    adj, indeg = [[] for _ in range(n)], [0] * n
+    for u, v in edges:
+        adj[u].append(v)
+        indeg[v] += 1
+    q = deque(i for i in range(n) if indeg[i] == 0)
+    order = []
+    while q:
+        u = q.popleft()
+        order.append(u)
+        for v in adj[u]:
+            indeg[v] -= 1
+            if indeg[v] == 0:
+                q.append(v)
+    return order if len(order) == n else None   # None: cycle
+\end{tpl}
+DFS alternative: colours 0 = new, 1 = on path, 2 = done; an edge to colour 1 is a cycle. Undirected
+cycle: union--find returns \cd{False}, or DFS that ignores the parent edge.
+
+\subsection{Functional graph (one outgoing edge each)}
+\begin{py}
+seen, cur = {start}, start
+while cur in nxt and nxt[cur] not in seen:
+    cur = nxt[cur]; seen.add(cur)
+# Floyd (O(1) memory): slow = f(slow); fast = f(f(fast))
+\end{py}
+
+\subsection{Trees}
+\begin{py}
+def depth(node):                      # postorder: combine children
+    if not node: return 0
+    return 1 + max(depth(node.left), depth(node.right))
+# level order: deque, `for _ in range(len(q))`
+# BST inorder = sorted; validate with (lo, hi) bounds
+# serialize: preorder with "#" for None
+\end{py}
+
+% =====================================================================
+\section{Templates: arrays and searching}
+
+\subsection{Two pointers}
+\begin{py}
+l, r = 0, len(a) - 1                 # sorted a: pair sum
+while l < r:
+    s = a[l] + a[r]
+    if s == t: ...; l += 1; r -= 1
+    elif s < t: l += 1
+    else: r -= 1
+# fast/slow pointers: cycle detection, middle of list
+# read/write pointers: in-place filtering
+\end{py}
+
+\subsection{Sliding window}
+\begin{tpl}
+def longest_window(a, ok_to_add, add, remove):
+    # generic variable window: grow right, shrink left
+    best, l = 0, 0
+    for r, x in enumerate(a):
+        while not ok_to_add(x):
+            remove(a[l])
+            l += 1
+        add(x)
+        best = max(best, r - l + 1)
+    return best
+\end{tpl}
+Counting windows: if every window ending at \cd{r} with start \cd{>= l} is valid, add \cd{r - l + 1}.
+``Exactly $k$'' $=$ ``at most $k$'' $-$ ``at most $k-1$''. Fixed size $k$: add \cd{a[r]}, drop \cd{a[r-k]}.
+
+\subsection{Prefix sums}
+\begin{tpl}
+def count_subarrays_with_sum(nums, k):
+    seen, pre, cnt = {0: 1}, 0, 0    # prefix -> frequency
+    for x in nums:
+        pre += x
+        cnt += seen.get(pre - k, 0)  # look up before insert
+        seen[pre] = seen.get(pre, 0) + 1
+    return cnt
+
+def prefix_2d(g):
+    R, C = len(g), len(g[0])
+    P = [[0] * (C + 1) for _ in range(R + 1)]
+    for r in range(R):
+        for c in range(C):
+            P[r+1][c+1] = g[r][c] + P[r][c+1] + P[r+1][c] - P[r][c]
+    return P
+# sum of rows r1..r2, cols c1..c2 (inclusive):
+# P[r2+1][c2+1] - P[r1][c2+1] - P[r2+1][c1] + P[r1][c1]
+\end{tpl}
+Variants: first index per prefix (longest subarray), key \cd{pre mod k} (divisible), parity/bitmask
+prefix. \textbf{Difference array}: add $v$ on \cd{[l, r]} via \cd{D[l] += v; D[r+1] -= v}, then prefix-sum.
+
+\subsection{Binary search on the answer}
+\begin{tpl}
+def max_true(lo, hi, ok):            # ok monotone True...False
+    while lo < hi:
+        mid = (lo + hi + 1) // 2     # round UP with lo = mid
+        if ok(mid):
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+def min_true(lo, hi, ok):            # ok monotone False...True
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if ok(mid):
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+\end{tpl}
+For floats, loop a fixed 100 times. Typical: capacity/speed/time minimisation, max side length, $k$-th
+smallest.
+
+\subsection{Monotonic stack}
+\begin{tpl}
+def next_greater(a):
+    res, st = [-1] * len(a), []      # st holds indices
+    for i, x in enumerate(a):
+        while st and a[st[-1]] < x:
+            res[st.pop()] = x
+        st.append(i)
+    return res
+\end{tpl}
+Also: largest rectangle in histogram, daily temperatures, sliding window max (monotonic deque).
+
+\subsection{Intervals}
+\begin{py}
+iv.sort()                            # by start
+out = []
+for s, e in iv:
+    if out and s <= out[-1][1]: out[-1][1] = max(out[-1][1], e)
+    else: out.append([s, e])
+# max non-overlapping: sort by END, keep if start >= last_end
+# min rooms: sort starts and ends, or heap of end times
+# sweep line: events (t, +1) / (t, -1), sort, running sum
+\end{py}
+
+\subsection{Greedy}
+Make the locally best choice and prove it with an exchange argument, or stress-test it against brute
+force. Common: farthest reach (jump games), earliest end (intervals), sort + take largest/smallest,
+min/max heap of candidates.
+
+% =====================================================================
+\section{Templates: backtracking}
+\begin{tpl}
+def subsets(nums):
+    res, path = [], []
+    def bt(i):
+        if i == len(nums):
+            res.append(path[:])          # COPY
+            return
+        path.append(nums[i]); bt(i + 1); path.pop()   # take
+        bt(i + 1)                                      # skip
+    bt(0)
+    return res
+
+def combos(cands, target):          # reuse allowed
+    cands, res, path = sorted(cands), [], []
+    def bt(start, rem):
+        if rem == 0:
+            res.append(path[:]); return
+        for i in range(start, len(cands)):
+            if cands[i] > rem: break          # sorted -> prune
+            path.append(cands[i])
+            bt(i, rem - cands[i])             # i+1: no reuse
+            path.pop()
+    bt(0, target)
+    return res
+
+def perms(nums):
+    res, path, used = [], [], [False] * len(nums)
+    def bt():
+        if len(path) == len(nums):
+            res.append(path[:]); return
+        for i, x in enumerate(nums):
+            if not used[i]:
+                used[i] = True; path.append(x)
+                bt()
+                path.pop(); used[i] = False
+    bt()
+    return res
+\end{tpl}
+\textbf{Duplicates in input:} sort, then skip \cd{i > start and a[i] == a[i-1]} (permutations: skip if
+\cd{a[i] == a[i-1] and not used[i-1]}). \textbf{Grid paths:} mark the cell, recurse into neighbours, unmark.
+\textbf{Pruning:} sort descending to fail fast; bound by the remaining sum; skip symmetric states (e.g.\ equal
+bucket sums); check necessary conditions first (counts, divisibility).
+
+% =====================================================================
+\section{Templates: dynamic programming}
+Steps: define the state in words, write the transition and the base case, pick an order so dependencies are
+ready, then read off the answer. Top-down \cd{@cache} is quickest to write; bottom-up avoids recursion and is
+faster.
+
+\begin{tabular}{@{}p{2.4cm}p{5.4cm}@{}}
+\toprule
+Family & Core recurrence \\
+\midrule
+Kadane & \cd{cur = max(x, cur + x)} \\
+House robber & \cd{dp[i] = max(dp[i-1], dp[i-2] + a[i])} \\
+Grid paths & \cd{dp[r][c] = dp[r-1][c] + dp[r][c-1]} \\
+0/1 knapsack & items outer, capacity \textbf{descending} \\
+Unbounded & capacity \textbf{ascending} (or items inner) \\
+Count combos & coins outer, amount inner \\
+Count orders & amount outer, coins inner \\
+String prefix & \cd{dp[i] = any(dp[j] and s[j:i] ok)} \\
+LIS & tails + \cd{bisect_left}: $O(n \log n)$ \\
+LCS / edit & \cd{dp[i][j]} from \cd{(i-1,j-1),(i-1,j),(i,j-1)} \\
+Interval & \cd{dp[i][j]} by increasing length \\
+Minimax game & \cd{f(i,j) = max(a[i]-f(i+1,j), a[j]-f(i,j-1))} \\
+Bitmask & \cd{dp[mask]}, \cd{n <= 20} \\
+State machine & \cd{dp[i][state]} (stock buy/sell/cooldown) \\
+\bottomrule
+\end{tabular}
+
+\begin{tpl}
+def knapsack_01(weights, values, cap):
+    dp = [0] * (cap + 1)
+    for w, v in zip(weights, values):
+        for c in range(cap, w - 1, -1):     # descending: once
+            dp[c] = max(dp[c], dp[c - w] + v)
+    return dp[cap]
+
+def min_coins(coins, amount):               # unbounded
+    INF = amount + 1
+    dp = [0] + [INF] * amount
+    for a in range(1, amount + 1):
+        for c in coins:
+            if c <= a:
+                dp[a] = min(dp[a], dp[a - c] + 1)
+    return dp[amount] if dp[amount] < INF else -1
+
+def lis_length(a):
+    import bisect
+    tails = []                  # tails[k] = min tail of an inc. seq of len k+1
+    for x in a:
+        i = bisect.bisect_left(tails, x)
+        tails[i:i + 1] = [x]
+    return len(tails)
+
+def edit_distance(s, t):
+    prev = list(range(len(t) + 1))
+    for i in range(1, len(s) + 1):
+        cur = [i] + [0] * len(t)
+        for j in range(1, len(t) + 1):
+            if s[i - 1] == t[j - 1]:
+                cur[j] = prev[j - 1]
+            else:
+                cur[j] = 1 + min(prev[j - 1], prev[j], cur[j - 1])
+        prev = cur
+    return prev[-1]
+
+def interval_game(a):           # first player's score, both optimal
+    n, pre = len(a), [0]
+    for x in a:
+        pre.append(pre[-1] + x)
+    dp = a[:]                   # dp[i] = best for player to move on a[i:i+L]
+    for L in range(2, n + 1):
+        dp = [pre[i+L] - pre[i] - min(dp[i], dp[i+1]) for i in range(n - L + 1)]
+    return dp[0]
+\end{tpl}
+Space: if a row depends only on the previous row, keep two rows (or one, with the right loop direction).
+
+% =====================================================================
+\section{Simulation techniques}
+\begin{itemize}
+  \item \textbf{Synchronous updates:} read the old state only. Write to a new grid, or keep the next state
+        in spare bits (\cd{cell |= 2}, then \cd{cell >>= 1}).
+  \item \textbf{Deleting while scanning:} use an index-based \cd{while} loop; decide whether the index stays
+        or advances after each deletion; keep parallel arrays in sync.
+  \item \textbf{Rounds until stable:} loop until a round changes nothing (track a \cd{changed} flag).
+  \item \textbf{Huge repetition:} detect a cycle of states (dict state $\to$ step), or track only
+        offsets/extremes, or use math.
+  \item \textbf{Robot/direction:} index into a clockwise list; positions as \cd{(r, c)}; validate each move.
+  \item \textbf{Try every single edit:} precompute prefix states so each candidate only re-simulates the suffix.
+  \item \textbf{Neighbourhood ops (blur, counts):} loop \cd{dr, dc in (-1, 0, 1)}, skip out of bounds, divide by the
+        actual neighbour count; check the rounding rule (\cd{//}, round half up, banker's).
+\end{itemize}
+
+% =====================================================================
+\section{Math and counting}
+\begin{py}
+MOD = 10**9 + 7                   # reduce after every op
+# sieve of primes up to n
+is_p = [True] * (n + 1); is_p[0] = is_p[1] = False
+for i in range(2, math.isqrt(n) + 1):
+    if is_p[i]:
+        is_p[i*i::i] = [False] * len(range(i*i, n + 1, i))
+# arithmetic series: n * (n + 1) // 2 ;  pairs: n * (n - 1) // 2
+# count paths of length 2 through v: deg(v) * (deg(v) - 1) // 2
+# count length-3 paths: fix the MIDDLE edge, multiply end choices
+# Manhattan distance |dx| + |dy|; rotate with (x + y, x - y)
+\end{py}
+
+% =====================================================================
+\section{Index mapping and gradients}
+\begin{py}
+order = sorted(range(n), key=lambda i: x[i])  # sorted pos -> orig idx
+s = [x[i] for i in order]
+grad_x = [0.0] * n
+for k, i in enumerate(order):
+    grad_x[i] = grad_s[k]       # a permutation's backward = scatter back
+\end{py}
+Chain rule over every path: a value used twice (e.g.\ an element that is also the median/normaliser)
+receives the sum of both contributions. For $y = u / m$: $\partial y/\partial u = 1/m$,
+$\partial y/\partial m = -u/m^2$. Check against a central difference
+$\bigl(f(x + h) - f(x - h)\bigr)/2h$ with $h \approx 10^{-6}$.
+
+% =====================================================================
+\section{Testing your solution fast}
+\begin{py}
+import random
+for _ in range(1000):                # stress test
+    n = random.randint(1, 8)
+    a = [random.randint(-5, 5) for _ in range(n)]
+    assert fast(a) == brute(a), a     # prints the failing input
+\end{py}
+Hand-check: empty, one element, all equal, all negative, sorted/reversed, duplicates, max size (time), deepest
+recursion, disconnected graph, no answer ($-1$/0/\cd{False}).
+
+% =====================================================================
+\section{Pre-submit checklist}
+\begin{itemize}
+  \item Output type and format exactly as asked (int vs.\ bool, string spacing, 0- vs.\ 1-indexed).
+  \item Ties broken as specified; ``every'' vs.\ ``exists''; strict vs.\ non-strict comparisons.
+  \item Hidden $O(n)$ in a loop: \cd{in list}, \cd{pop(0)}, slicing, \cd{sum}, string concatenation.
+  \item Recursion depth over about 1000 frames?
+  \item BFS marks visited on enqueue; backtracking appends copies.
+  \item Inputs mutated that shouldn't be? Global state or caches reset between calls?
+  \item Integer division and modulo semantics with negatives.
+\end{itemize}
+
+\end{multicols}
+\end{document}
