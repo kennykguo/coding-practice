@@ -17,12 +17,14 @@ def transform_image(image: list[list[int]], operation: str) -> list[list[int]]:
                 temp = image[i][l]
                 image[i][l] = image[i][r]
                 image[i][r] = temp
+                l+=1
+                r-=1
         return image
 
     else:
         
         copy_image = [[ 0 for i in range(len(image[0]))] for j in range(len(image))]
-        print(copy_image) # WHY did copy_image = image.copy() not work?
+        # print(copy_image) # WHY did copy_image = image.copy() not work?
 
         for i in range(rows):
             for j in range(cols):
@@ -39,9 +41,9 @@ def transform_image(image: list[list[int]], operation: str) -> list[list[int]]:
                         total +=image[r][c]
                         count +=1
                     
-                print(i, j)
-                print(total)
-                print(count)
+                # print(i, j)
+                # print(total)
+                # print(count)
                 copy_image[i][j] = total // count if count !=0 else image[i][j]
     
     return copy_image
