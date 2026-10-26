@@ -1,0 +1,41 @@
+{
+  "tool": "Yosys 0.57 (git sha1 3aca86049e79a165932e3e7660358376f45acaed, clang++ 16.0.0 -fPIC -O3)",
+  "checks": [
+    {
+      "module": "counter",
+      "default_parameters": true,
+      "passed": true
+    },
+    {
+      "module": "rv_register",
+      "default_parameters": true,
+      "passed": true
+    },
+    {
+      "module": "sync_fifo",
+      "default_parameters": true,
+      "passed": true
+    },
+    {
+      "module": "sync_ram",
+      "default_parameters": true,
+      "passed": true
+    },
+    {
+      "module": "mac",
+      "default_parameters": true,
+      "passed": true
+    },
+    {
+      "module": "weight_bank",
+      "default_parameters": true,
+      "passed": true
+    },
+    {
+      "module": "stream_sum",
+      "default_parameters": true,
+      "passed": true
+    }
+  ],
+  "scope": "Parse, hierarchy, process lowering, structural check, and no inferred latches. No technology mapping or timing analysis."
+}

@@ -1,0 +1,91 @@
+{
+  "python": "3.13.7",
+  "cocotb": "2.0.0",
+  "simulator": "Icarus Verilog version 12.0 (stable) ()",
+  "random_seed": 426,
+  "cases": [
+    {
+      "module": "counter",
+      "parameters": {
+        "LIMIT": 1
+      },
+      "passed": true
+    },
+    {
+      "module": "counter",
+      "parameters": {
+        "LIMIT": 3
+      },
+      "passed": true
+    },
+    {
+      "module": "counter",
+      "parameters": {
+        "LIMIT": 10
+      },
+      "passed": true
+    },
+    {
+      "module": "counter",
+      "parameters": {
+        "LIMIT": 16
+      },
+      "passed": true
+    },
+    {
+      "module": "sync_fifo",
+      "parameters": {
+        "DEPTH": 1
+      },
+      "passed": true
+    },
+    {
+      "module": "sync_fifo",
+      "parameters": {
+        "DEPTH": 3
+      },
+      "passed": true
+    },
+    {
+      "module": "sync_fifo",
+      "parameters": {
+        "DEPTH": 8
+      },
+      "passed": true
+    },
+    {
+      "module": "rv_register",
+      "parameters": {},
+      "passed": true
+    },
+    {
+      "module": "sync_ram",
+      "parameters": {},
+      "passed": true
+    },
+    {
+      "module": "mac",
+      "parameters": {},
+      "passed": true
+    },
+    {
+      "module": "weight_bank",
+      "parameters": {},
+      "passed": true
+    },
+    {
+      "module": "stream_sum",
+      "parameters": {},
+      "passed": true
+    },
+    {
+      "module": "lane_adders",
+      "parameters": {},
+      "passed": true
+    },
+    {
+      "module": "printed cocotb example",
+      "passed": true
+    }
+  ]
+}
